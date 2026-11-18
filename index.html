@@ -1,182 +1,300 @@
+
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Expense Tracker</title>
-
-    <link rel="stylesheet" href="../css/style.css">
+    <title>SmartTrack | Expense Tracker</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-    <div class="container">
-
-        <!-- Sidebar -->
+    <div class="app-container">
         <aside class="sidebar">
-            <h2>SmartTrack</h2>
+            <h2 class="brand">SMART<span>TRACK</span></h2>
 
-            <nav>
-                <a href="#" class="active">Dashboard</a>
-                <a href="#">Transactions</a>
-                <a href="#">Analytics</a>
-                <a href="#">Budgets</a>
-                <a href="#">Settings</a>
+            <nav class="sidebar-nav" aria-label="Main navigation">
+                <button class="nav-link active" type="button" data-page="dashboard">Dashboard</button>
+                <button class="nav-link" type="button" data-page="transactions">Transactions</button>
+                <button class="nav-link" type="button" data-page="analytics">Analytics</button>
+                <button class="nav-link" type="button" data-page="budgets">Budgets</button>
+                <button class="nav-link" type="button" data-page="settings">Settings</button>
             </nav>
         </aside>
 
-
-        <!-- Main Content -->
         <main class="main-content">
 
-            <!-- Header -->
-            <header class="header">
-                <div>
-                    <h1>Dashboard</h1>
-                    <p>Welcome to your expense tracker!</p>
-                </div>
+            <!-- DASHBOARD -->
+            
+<!-- DASHBOARD -->
+<section id="dashboard" class="page-section active">
 
-                <button id="showFormBtn">+ Add Transaction</button>
-            </header>
+    <header class="page-header">
+        <div>
+            <h1>Dashboard</h1>
+            <p>Welcome to SmartTrack! Here's your financial overview.</p>
+        </div>
 
+        <button id="showFormBtn" class="primary-btn" type="button">
+            + Add Transaction
+        </button>
+    </header>
 
-            <!-- Dashboard Cards -->
-            <section class="cards">
+    <!-- SUMMARY CARDS -->
+    <div class="summary-cards">
 
-                <div class="card">
-                    <h3>Total Balance</h3>
-                    <h2 id="balance">₹0</h2>
-                </div>
+        <article class="summary-card">
+            <h3>Total Balance</h3>
+            <p id="balance" class="summary-value">₹0</p>
+            <small>Your current balance</small>
+        </article>
 
-                <div class="card">
-                    <h3>Total Income</h3>
-                    <h2 id="income">₹0</h2>
-                </div>
+        <article class="summary-card">
+            <h3>Total Income</h3>
+            <p id="income" class="summary-value">₹0</p>
+            <small>Total money received</small>
+        </article>
 
-                <div class="card">
-                    <h3>Total Expenses</h3>
-                    <h2 id="expenses">₹0</h2>
-                </div>
-
-            </section>
-
-
-            <!-- Add Transaction Form -->
-            <form id="transactionForm" hidden>
-
-                <h2>Add New Transaction</h2>
-
-                <label for="transactionName">Transaction Name</label>
-                <input type="text" id="transactionName" placeholder="Example: Food" required>
-
-                <label for="transactionAmount">Amount (₹)</label>
-                <input type="number" id="transactionAmount" placeholder="Enter amount" min="0.01" step="0.01" required>
-
-                <label for="transactionType">Transaction Type</label>
-                <select id="transactionType">
-                    <option value="expense">Expense</option>
-                    <option value="income">Income</option>
-                </select>
-
-                <label for="transactionCategory">Category</label>
-                <select id="transactionCategory">
-                    <option value="Food">Food</option>
-                    <option value="Travel">Travel</option>
-                    <option value="Shopping">Shopping</option>
-                    <option value="Bills">Bills</option>
-                    <option value="Salary">Salary</option>
-                    <option value="Other">Other</option>
-                </select>
-
-                <label for="transactionDate">Transaction Date</label>
-                <input type="date" id="transactionDate" required>
-
-                <button type="submit">Add Transaction</button>
-
-            </form>
-
-            <!-- analytic's section -->
-
-            <section class="analytics">
-                <h2>Expense Analytics</h2>
-
-                <div class="chart-container">
-                    <div class="chart-box">
-                        <h3>Expenses by Category</h3>
-                        <canvas id="expenseChart"></canvas>
-                    </div>
-
-                    <div class="chart-box">
-                        <h3>Income vs Expenses</h3>
-                        <canvas id="incomeExpenseChart"></canvas>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ================================== -->
-            <!-- MONTHLY BUDGET SECTION -->
-            <!-- ================================== -->
-
-            <section class="budget-section">
-
-                <h2>Monthly Budget</h2>
-
-                <form id="budgetForm">
-
-                    <input type="text" id="budgetCategory" placeholder="Enter category" required>
-
-                    <input type="number" id="budgetAmount" placeholder="Enter budget amount" min="1" required>
-
-                    <button type="submit">Set Budget</button>
-
-                </form>
-
-                <div id="budgetList"></div>
-
-            </section>
-
-            <!-- Recent Transactions -->
-
-            <section class="transactions">
-
-                <h2>Recent Transactions</h2>
-
-                <!-- Search and Filter Controls -->
-
-                <div class="filter-controls">
-
-                    <input type="text" id="searchInput" placeholder="Search transactions...">
-
-                    <select id="typeFilter">
-                        <option value="all">All Types</option>
-                        <option value="income">Income</option>
-                        <option value="expense">Expense</option>
-                    </select>
-
-                    <select id="categoryFilter">
-                        <option value="all">All Categories</option>
-                        <option value="Food">Food</option>
-                        <option value="Travel">Travel</option>
-                        <option value="Shopping">Shopping</option>
-                        <option value="Bills">Bills</option>
-                        <option value="Salary">Salary</option>
-                        <option value="Other">Other</option>
-                    </select>
-
-                </div>
-
-                <div id="transactionList"></div>
-
-            </section>
-
-        </main>
+        <article class="summary-card">
+            <h3>Total Expenses</h3>
+            <p id="expenses" class="summary-value">₹0</p>
+            <small>Total money spent</small>
+        </article>
 
     </div>
 
+
+    <!-- DASHBOARD OVERVIEW -->
+    <div class="dashboard-grid">
+
+        <!-- RECENT TRANSACTIONS -->
+        <section class="dashboard-panel">
+            <div class="dashboard-panel-header">
+                <h2>Recent Transactions</h2>
+                <button class="text-btn" type="button" data-go-page="transactions">
+                    View All
+                </button>
+            </div>
+
+            <div id="dashboardRecentTransactions"></div>
+        </section>
+
+
+        <!-- ANALYTICS INSIGHT -->
+        <section class="dashboard-panel">
+            <div class="dashboard-panel-header">
+                <h2>Spending Insight</h2>
+                <button class="text-btn" type="button" data-go-page="analytics">
+                    Analytics
+                </button>
+            </div>
+
+            <p class="insight-label">Highest spending category</p>
+            <h2 id="topExpenseCategory" class="insight-value">No data yet</h2>
+
+            <p class="insight-label">Total expenses</p>
+            <h2 id="dashboardExpenseTotal" class="insight-value">₹0</h2>
+
+            <p id="dashboardInsightMessage" class="insight-message">
+                Add transactions to see your spending insights.
+            </p>
+        </section>
+
+
+        <!-- BUDGET OVERVIEW -->
+        <section class="dashboard-panel">
+            <div class="dashboard-panel-header">
+                <h2>Budget Overview</h2>
+                <button class="text-btn" type="button" data-go-page="budgets">
+                    View Budgets
+                </button>
+            </div>
+
+            <div id="dashboardBudgetOverview"></div>
+        </section>
+
+
+        <!-- QUICK ACTIONS -->
+        <section class="dashboard-panel quick-actions-panel">
+            <h2>Quick Actions</h2>
+
+            <div class="quick-actions">
+                <button type="button" data-go-page="transactions">
+                    <span>＋</span>
+                    Add Transaction
+                </button>
+
+                <button type="button" data-go-page="analytics">
+                    <span>▥</span>
+                    View Analytics
+                </button>
+
+                <button type="button" data-go-page="budgets">
+                    <span>₹</span>
+                    Manage Budgets
+                </button>
+            </div>
+        </section>
+
+    </div>
+
+</section>
+
+
+            <!-- TRANSACTIONS -->
+            <section id="transactions" class="page-section">
+                <header class="page-header">
+                    <div>
+                        <h1>Transactions</h1>
+                        <p>Add, search, edit and review your transaction history.</p>
+                    </div>
+                </header>
+
+                <section class="panel">
+                    <h2>Add Transaction</h2>
+                    <form id="transactionForm" class="transaction-form">
+                        <label>
+                            Transaction name
+                            <input type="text" id="transactionName" placeholder="e.g. Grocery shopping" required>
+                        </label>
+
+                        <label>
+                            Amount (₹)
+                            <input type="number" id="transactionAmount" placeholder="e.g. 500" min="0.01" step="0.01" required>
+                        </label>
+
+                        <label>
+                            Type
+                            <select id="transactionType" required>
+                                <option value="expense">Expense</option>
+                                <option value="income">Income</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Category
+                            <select id="transactionCategory" required>
+                                <option value="Food">Food</option>
+                                <option value="Travel">Travel</option>
+                                <option value="Shopping">Shopping</option>
+                                <option value="Bills">Bills</option>
+                                <option value="Salary">Salary</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Date
+                            <input type="date" id="transactionDate" required>
+                        </label>
+
+                        <button class="primary-btn form-submit" type="submit">Save Transaction</button>
+                    </form>
+                </section>
+
+                <section class="panel transaction-history">
+                    <h2>Transaction History</h2>
+                    <div class="filter-controls">
+                        <input type="search" id="searchInput" placeholder="Search transactions..." aria-label="Search transactions">
+                        <select id="typeFilter" aria-label="Filter by type">
+                            <option value="all">All Types</option>
+                            <option value="income">Income</option>
+                            <option value="expense">Expense</option>
+                        </select>
+                        <select id="categoryFilter" aria-label="Filter by category">
+                            <option value="all">All Categories</option>
+                            <option value="Food">Food</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Bills">Bills</option>
+                            <option value="Salary">Salary</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div id="transactionList" class="transaction-list"></div>
+                </section>
+            </section>
+
+            <!-- ANALYTICS -->
+            <section id="analytics" class="page-section">
+                <header class="page-header">
+                    <div>
+                        <h1>Analytics</h1>
+                        <p>Understand where your money comes from and where it goes.</p>
+                    </div>
+                </header>
+
+                <div class="chart-container">
+                    <article class="chart-box">
+                        <h2>Expenses by Category</h2>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="expenseChart"></canvas>
+                        </div>
+                    </article>
+                    <article class="chart-box">
+                        <h2>Income vs Expenses</h2>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="incomeExpenseChart"></canvas>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- BUDGETS -->
+            <section id="budgets" class="page-section">
+                <header class="page-header">
+                    <div>
+                        <h1>Monthly Budgets</h1>
+                        <p>Set category limits and monitor your monthly spending.</p>
+                    </div>
+                </header>
+
+                <section class="panel">
+                    <h2>Set a Monthly Budget</h2>
+                    <form id="budgetForm" class="budget-form">
+                        <label>
+                            Category
+                            <input type="text" id="budgetCategory" placeholder="e.g. Food" list="budgetCategories" required>
+                            <datalist id="budgetCategories">
+                                <option value="Food"></option>
+                                <option value="Travel"></option>
+                                <option value="Shopping"></option>
+                                <option value="Bills"></option>
+                                <option value="Other"></option>
+                            </datalist>
+                        </label>
+                        <label>
+                            Monthly limit (₹)
+                            <input type="number" id="budgetAmount" placeholder="e.g. 5000" min="0.01" step="0.01" required>
+                        </label>
+                        <button class="primary-btn" type="submit">Save Budget</button>
+                    </form>
+                </section>
+
+                <section class="panel">
+                    <h2>Your Budgets</h2>
+                    <div id="budgetList" class="budget-list"></div>
+                </section>
+            </section>
+
+            <!-- SETTINGS -->
+            <section id="settings" class="page-section">
+                <header class="page-header">
+                    <div>
+                        <h1>Settings</h1>
+                        <p>Application information.</p>
+                    </div>
+                </header>
+                <section class="panel">
+                    <h2>SmartTrack</h2>
+                    <p class="muted">Personal Expense Tracker · Version 1.0</p>
+                    <p>Your transactions and budgets are stored in this browser using LocalStorage.</p>
+                </section>
+            </section>
+
+        </main>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="../js/script.js"></script>
-
+<script src="script.js"></script>
 </body>
-
 </html>
