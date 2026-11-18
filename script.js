@@ -1,12 +1,16 @@
 
+"use strict";
+
 // ======================================
-// 1. LOAD SAVED DATA
+// 1. LOAD AND SAVE DATA
 // ======================================
 
-function loadArrayFromStorage(key, fallback) {
+function loadArrayFromStorage(key, fallback = []) {
     const saved = localStorage.getItem(key);
 
-    if (saved === null) return fallback;
+    if (saved === null) {
+        return fallback;
+    }
 
     try {
         const parsed = JSON.parse(saved);
@@ -18,787 +22,351 @@ function loadArrayFromStorage(key, fallback) {
 }
 
 let transactions = loadArrayFromStorage("transactions", [
-    { id: 1, name: "Salary", amount: 20000, type: "income", category: "Salary", date: "2026-11-18" },
-    { id: 2, name: "Food", amount: 500, type: "expense", category: "Food", date: "2026-11-18" },
-    { id: 3, name: "Travel", amount: 300, type: "expense", category: "Travel", date: "2026-11-18" },
-    { id: 4, name: "Shopping", amount: 700, type: "expense", category: "Shopping", date: "2026-11-18" }
+    {
+        id: 1,
+        name: "Salary",
+        amount: 20000,
+        type: "income",
+        category: "Salary",
+        date: "2026-11-18"
+    },
+    {
+        id: 2,
+        name: "Food",
+        amount: 500,
+        type: "expense",
+        category: "Food",
+        date: "2026-11-18"
+    },
+    {
+        id: 3,
+        name: "Travel",
+        amount: 300,
+        type: "expense",
+        category: "Travel",
+        date: "2026-11-18"
+    },
+    {
+        id: 4,
+        name: "Shopping",
+        amount: 700,
+        type: "expense",
+        category: "Shopping",
+        date: "2026-11-18"
+    }
 ]);
 
 let budgets = loadArrayFromStorage("budgets", []);
 
-if (localStorage.getItem("transactions") === null) {
+function saveTransactions() {
     localStorage.setItem("transactions", JSON.stringify(transactions));
 }
 
-
-// ======================================
-// 2. SELECT HTML ELEMENTS
-// ======================================
-
-const balanceElement = document.getElementById("balance");
-const incomeElement = document.getElementById("income");
-const expensesElement = document.getElementById("expenses");
-
-const transactionForm = document.getElementById("transactionForm");
-const transactionList = document.getElementById("transactionList");
-const showFormBtn = document.getElementById("showFormBtn");
-
-const searchInput = document.getElementById("searchInput");
-const typeFilter = document.getElementById("typeFilter");
-const categoryFilter = document.getElementById("categoryFilter");
-
-const expenseChartCanvas = document.getElementById("expenseChart");
-const incomeExpenseCanvas = document.getElementById("incomeExpenseChart");
-
-const budgetForm = document.getElementById("budgetForm");
-const budgetCategory = document.getElementById("budgetCategory");
-const budgetAmount = document.getElementById("budgetAmount");
-const budgetList = document.getElementById("budgetList");
-
-const navLinks = document.querySelectorAll(".nav-link");
-const pages = document.querySelectorAll(".page-section");
-
-// Dashboard elements
-const dashboardRecentTransactions =
-    document.getElementById("dashboardRecentTransactions");
-
-const topExpenseCategory =
-    document.getElementById("topExpenseCategory");
-
-const dashboardExpenseTotal =
-    document.getElementById("dashboardExpenseTotal");
-
-const dashboardInsightMessage =
-    document.getElementById("dashboardInsightMessage");
-
-const dashboardBudgetOverview =
-    document.getElementById("dashboardBudgetOverview");
-
-let expenseChart = null;
-let incomeExpenseChart = null;
-
-
-// ======================================
-// 3. SAVE DATA
-// ======================================
-
-function saveTransactions() {
-    try {
-        localStorage.setItem(
-            "transactions",
-            JSON.stringify(transactions)
-        );
-    } catch (error) {
-        console.error("Could not save transactions:", error);
-        alert("Unable to save transactions.");
-    }
-}
-
 function saveBudgets() {
+    localStorage.setItem("budgets", JSON.stringify(budgets));
+}
+
+// ======================================
+// 2. CURRENCY CONVERSION
+// ======================================
+
+// All transaction and budget amounts are stored in INR.
+// These rates convert INR into the selected display currency.
+
+let exchangeRates = {
+    INR: 1
+};
+
+const supportedCurrencies = ["INR", "USD", "EUR", "GBP"];
+
+function getSelectedCurrency() {
+    const savedCurrency =
+        localStorage.getItem("smartTrackCurrency") || "INR";
+
+    return supportedCurrencies.includes(savedCurrency)
+        ? savedCurrency
+        : "INR";
+}
+
+// Convert an INR amount into the selected currency.
+function convertCurrency(amount) {
+    const currency = getSelectedCurrency();
+    const rate = exchangeRates[currency];
+
+    if (!Number.isFinite(rate)) {
+        return Number(amount) || 0;
+    }
+
+    return (Number(amount) || 0) * rate;
+}
+
+// Format the converted amount with the correct currency symbol.
+function formatCurrency(amount) {
+    const currency = getSelectedCurrency();
+    const convertedAmount = convertCurrency(amount);
+
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: currency,
+        maximumFractionDigits: 2
+    }).format(convertedAmount);
+}
+
+// Get the latest available exchange rate from INR.
+async function loadExchangeRate(currency) {
+    if (currency === "INR") {
+        exchangeRates.INR = 1;
+        return true;
+    }
+
     try {
-        localStorage.setItem(
-            "budgets",
-            JSON.stringify(budgets)
+        const response = await fetch(
+            `https://api.frankfurter.dev/v1/latest?base=INR&symbols=${currency}`
         );
+
+        if (!response.ok) {
+            throw new Error("Exchange rate request failed.");
+        }
+
+        const data = await response.json();
+        const rate = data.rates[currency];
+
+        if (!Number.isFinite(rate) || rate <= 0) {
+            throw new Error("Invalid exchange rate.");
+        }
+
+        exchangeRates[currency] = rate;
+
+        console.log(
+            `1 INR = ${rate} ${currency}`
+        );
+
+        return true;
+
     } catch (error) {
-        console.error("Could not save budgets:", error);
-        alert("Unable to save budgets.");
+        console.error("Currency conversion error:", error);
+        return false;
     }
 }
 
+// ======================================
+// 3. HELPER FUNCTIONS
+// ======================================
+
+function getTodayString() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+}
+
+function getTotal(type) {
+    return transactions
+        .filter(function (transaction) {
+            return transaction.type === type;
+        })
+        .reduce(function (total, transaction) {
+            return total + Number(transaction.amount);
+        }, 0);
+}
+
+function getTotalExpensesByCategory(category) {
+    return transactions
+        .filter(function (transaction) {
+            return transaction.type === "expense" &&
+                transaction.category === category;
+        })
+        .reduce(function (total, transaction) {
+            return total + Number(transaction.amount);
+        }, 0);
+}
+
+function getMonthTransactions() {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+
+    return transactions.filter(function (transaction) {
+        const transactionDate = new Date(
+            transaction.date + "T00:00:00"
+        );
+
+        return transactionDate.getMonth() === currentMonth &&
+            transactionDate.getFullYear() === currentYear;
+    });
+}
 
 // ======================================
 // 4. PAGE NAVIGATION
 // ======================================
 
-function showPage(pageName) {
+const navLinks = document.querySelectorAll(".nav-link");
 
-    pages.forEach(function (page) {
-        page.classList.toggle("active", page.id === pageName);
+function showPage(pageId) {
+    document.querySelectorAll(".page-section").forEach(function (page) {
+        page.classList.remove("active");
     });
 
-    navLinks.forEach(function (link) {
-        link.classList.toggle(
-            "active",
-            link.dataset.page === pageName
-        );
+    document.querySelectorAll(".nav-link").forEach(function (link) {
+        link.classList.remove("active");
     });
 
-    if (pageName === "analytics") {
-        requestAnimationFrame(function () {
-            if (expenseChart) expenseChart.resize();
-            if (incomeExpenseChart) incomeExpenseChart.resize();
-        });
+    const selectedPage = document.getElementById(pageId);
+
+    if (selectedPage) {
+        selectedPage.classList.add("active");
+    }
+
+    const selectedLink = document.querySelector(
+        `.nav-link[data-page="${pageId}"]`
+    );
+
+    if (selectedLink) {
+        selectedLink.classList.add("active");
+    }
+
+    if (pageId === "analytics") {
+        updateCharts();
     }
 }
 
-
-// Sidebar navigation
 navLinks.forEach(function (link) {
     link.addEventListener("click", function () {
         showPage(link.dataset.page);
     });
 });
 
-
-// Dashboard quick action buttons
-const dashboardButtons =
-    document.querySelectorAll("[data-go-page]");
-
-dashboardButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
-        showPage(button.dataset.goPage);
-    });
-});
-
-
-// Dashboard Add Transaction button
-showFormBtn.addEventListener("click", function () {
-    showPage("transactions");
-
-    document.getElementById("transactionName").focus();
-});
-
-
 // ======================================
-// 5. UPDATE DASHBOARD SUMMARY
+// 5. UPDATE DASHBOARD
 // ======================================
 
 function updateDashboard() {
-
-    let totalIncome = 0;
-    let totalExpenses = 0;
-
-    transactions.forEach(function (transaction) {
-
-        const amount = Number(transaction.amount) || 0;
-
-        if (transaction.type === "income") {
-            totalIncome += amount;
-        }
-
-        else if (transaction.type === "expense") {
-            totalExpenses += amount;
-        }
-    });
-
+    const totalIncome = getTotal("income");
+    const totalExpenses = getTotal("expense");
     const balance = totalIncome - totalExpenses;
 
-    balanceElement.textContent =
-        "₹" + balance.toLocaleString("en-IN");
+    document.getElementById("balance").textContent =
+        formatCurrency(balance);
 
-    incomeElement.textContent =
-        "₹" + totalIncome.toLocaleString("en-IN");
+    document.getElementById("income").textContent =
+        formatCurrency(totalIncome);
 
-    expensesElement.textContent =
-        "₹" + totalExpenses.toLocaleString("en-IN");
+    document.getElementById("expenses").textContent =
+        formatCurrency(totalExpenses);
 }
 
-
 // ======================================
-// 6. UPDATE ANALYTICS CHARTS
-// ======================================
-
-function updateCharts() {
-
-    if (typeof Chart === "undefined") {
-        console.error("Chart.js did not load. Check your internet connection.");
-        return;
-    }
-
-    const categoryTotals = {};
-
-    let totalIncome = 0;
-    let totalExpenses = 0;
-
-    transactions.forEach(function (transaction) {
-
-        const amount = Number(transaction.amount) || 0;
-
-        if (transaction.type === "expense") {
-
-            const category = transaction.category || "Other";
-
-            categoryTotals[category] =
-                (categoryTotals[category] || 0) + amount;
-
-            totalExpenses += amount;
-        }
-
-        else if (transaction.type === "income") {
-            totalIncome += amount;
-        }
-    });
-
-    const categories = Object.keys(categoryTotals);
-    const categoryAmounts = Object.values(categoryTotals);
-
-
-    // EXPENSE DOUGHNUT CHART
-
-    if (!expenseChart) {
-
-        expenseChart = new Chart(expenseChartCanvas, {
-            type: "doughnut",
-
-            data: {
-                labels: categories,
-
-                datasets: [{
-                    label: "Expenses",
-                    data: categoryAmounts,
-                    backgroundColor: [
-                        "#3b9ddd",
-                        "#f45b83",
-                        "#ff9848",
-                        "#8b78d6",
-                        "#36a77b",
-                        "#e0b34b"
-                    ],
-                    borderWidth: 2,
-                    borderColor: "#ffffff"
-                }]
-            },
-
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
-        });
-
-    } else {
-
-        expenseChart.data.labels = categories;
-        expenseChart.data.datasets[0].data = categoryAmounts;
-        expenseChart.update();
-    }
-
-
-    // INCOME VS EXPENSES BAR CHART
-
-    if (!incomeExpenseChart) {
-
-        incomeExpenseChart = new Chart(incomeExpenseCanvas, {
-            type: "bar",
-
-            data: {
-                labels: ["Income", "Expenses"],
-
-                datasets: [{
-                    label: "Amount (₹)",
-                    data: [totalIncome, totalExpenses],
-                    backgroundColor: ["#8ec5e8", "#f28b82"],
-                    borderRadius: 5,
-                    maxBarThickness: 90
-                }]
-            },
-
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grace: "5%"
-                    }
-                }
-            }
-        });
-
-    } else {
-
-        incomeExpenseChart.data.datasets[0].data = [
-            totalIncome,
-            totalExpenses
-        ];
-
-        incomeExpenseChart.update();
-    }
-}
-
-
-// ======================================
-// 7. DISPLAY TRANSACTIONS
-// ======================================
-
-function displayTransactions() {
-
-    const searchText =
-        searchInput.value.trim().toLowerCase();
-
-    const selectedType = typeFilter.value;
-    const selectedCategory = categoryFilter.value;
-
-    const filteredTransactions = transactions
-
-        .filter(function (transaction) {
-
-            const matchesSearch =
-                String(transaction.name)
-                    .toLowerCase()
-                    .includes(searchText);
-
-            const matchesType =
-                selectedType === "all" ||
-                transaction.type === selectedType;
-
-            const matchesCategory =
-                selectedCategory === "all" ||
-                transaction.category === selectedCategory;
-
-            return matchesSearch &&
-                matchesType &&
-                matchesCategory;
-        })
-
-        .sort(function (a, b) {
-            return new Date(b.date) - new Date(a.date) ||
-                Number(b.id) - Number(a.id);
-        });
-
-
-    transactionList.replaceChildren();
-
-    if (filteredTransactions.length === 0) {
-
-        const message = document.createElement("p");
-        message.className = "empty-message";
-        message.textContent = "No matching transactions found.";
-
-        transactionList.appendChild(message);
-        return;
-    }
-
-
-    filteredTransactions.forEach(function (transaction) {
-
-        const row = document.createElement("div");
-        row.className = "transaction";
-
-        const details = document.createElement("div");
-        details.className = "transaction-details";
-
-        const name = document.createElement("strong");
-        name.textContent = transaction.name;
-
-        const date = document.createElement("small");
-        date.textContent =
-            transaction.date + " | " + transaction.category;
-
-        details.append(name, date);
-
-
-        const amount = document.createElement("span");
-        const numericAmount = Number(transaction.amount) || 0;
-
-        if (transaction.type === "income") {
-
-            amount.textContent =
-                "+₹" + numericAmount.toLocaleString("en-IN");
-
-            amount.className = "income-amount";
-
-        } else {
-
-            amount.textContent =
-                "-₹" + numericAmount.toLocaleString("en-IN");
-
-            amount.className = "expense-amount";
-        }
-
-
-        const editButton = document.createElement("button");
-        editButton.type = "button";
-        editButton.textContent = "Edit";
-        editButton.className = "edit-btn";
-
-        editButton.addEventListener("click", function () {
-            editTransaction(transaction.id);
-        });
-
-
-        const deleteButton = document.createElement("button");
-        deleteButton.type = "button";
-        deleteButton.textContent = "Delete";
-        deleteButton.className = "delete-btn";
-
-        deleteButton.addEventListener("click", function () {
-            deleteTransaction(transaction.id);
-        });
-
-
-        row.append(
-            details,
-            amount,
-            editButton,
-            deleteButton
-        );
-
-        transactionList.appendChild(row);
-    });
-}
-
-
-// Search and filter events
-searchInput.addEventListener("input", displayTransactions);
-typeFilter.addEventListener("change", displayTransactions);
-categoryFilter.addEventListener("change", displayTransactions);
-
-
-// ======================================
-// 8. DATE VALIDATION
-// ======================================
-
-function isValidDate(dateString) {
-
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-        return false;
-    }
-
-    const parts = dateString.split("-").map(Number);
-
-    const date = new Date(
-        parts[0],
-        parts[1] - 1,
-        parts[2]
-    );
-
-    return (
-        date.getFullYear() === parts[0] &&
-        date.getMonth() === parts[1] - 1 &&
-        date.getDate() === parts[2]
-    );
-}
-
-
-function getTodayString() {
-
-    const today = new Date();
-
-    const year = today.getFullYear();
-
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-
-    const day = String(today.getDate()).padStart(2, "0");
-
-    return year + "-" + month + "-" + day;
-}
-
-
-function getCurrentMonthString() {
-
-    const today = new Date();
-
-    return (
-        today.getFullYear() +
-        "-" +
-        String(today.getMonth() + 1).padStart(2, "0")
-    );
-}
-
-
-// ======================================
-// 9. DASHBOARD RECENT TRANSACTIONS
+// 6. RECENT TRANSACTIONS
 // ======================================
 
 function updateRecentTransactions() {
+    const container = document.getElementById(
+        "dashboardRecentTransactions"
+    );
 
-    dashboardRecentTransactions.replaceChildren();
-
-    const recentTransactions = [...transactions]
-
+    const recent = [...transactions]
         .sort(function (a, b) {
-            return new Date(b.date) - new Date(a.date) ||
-                Number(b.id) - Number(a.id);
+            return new Date(b.date) - new Date(a.date) || b.id - a.id;
         })
-
         .slice(0, 5);
 
-
-    if (recentTransactions.length === 0) {
-
-        const message = document.createElement("p");
-        message.className = "empty-message";
-        message.textContent = "No transactions yet. Add your first transaction!";
-
-        dashboardRecentTransactions.appendChild(message);
+    if (recent.length === 0) {
+        container.innerHTML = "<p>No transactions yet.</p>";
         return;
     }
 
+    container.innerHTML = recent.map(function (transaction) {
+        const isIncome = transaction.type === "income";
+        const sign = isIncome ? "+" : "-";
+        const amountClass = isIncome ? "income-text" : "expense-text";
 
-    recentTransactions.forEach(function (transaction) {
-
-        const row = document.createElement("div");
-        row.className = "dashboard-transaction";
-
-        const info = document.createElement("div");
-        info.className = "dashboard-transaction-info";
-
-        const name = document.createElement("strong");
-        name.textContent = transaction.name;
-
-        const date = document.createElement("small");
-        date.textContent =
-            transaction.date + " · " + transaction.category;
-
-        info.append(name, date);
-
-
-        const amount = document.createElement("span");
-        const value = Number(transaction.amount) || 0;
-
-        amount.textContent =
-            (transaction.type === "income" ? "+" : "-") +
-            "₹" + value.toLocaleString("en-IN");
-
-        amount.className = "dashboard-transaction-amount";
-
-        amount.style.color =
-            transaction.type === "income" ? "#15945a" : "#dc4545";
-
-
-        row.append(info, amount);
-
-        dashboardRecentTransactions.appendChild(row);
-    });
+        return `
+            <div class="recent-item">
+                <div>
+                    <strong>${escapeHTML(transaction.name)}</strong>
+                    <small>${escapeHTML(transaction.category)} · ${transaction.date}</small>
+                </div>
+                <span class="recent-amount ${amountClass}">
+                    ${sign}${formatCurrency(transaction.amount)}
+                </span>
+            </div>
+        `;
+    }).join("");
 }
 
-
 // ======================================
-// 10. DASHBOARD SPENDING INSIGHTS
-// ======================================
-
-function updateSpendingInsight() {
-
-    const categoryTotals = {};
-
-    let totalExpenses = 0;
-
-    transactions.forEach(function (transaction) {
-
-        if (transaction.type === "expense") {
-
-            const amount = Number(transaction.amount) || 0;
-            const category = transaction.category || "Other";
-
-            categoryTotals[category] =
-                (categoryTotals[category] || 0) + amount;
-
-            totalExpenses += amount;
-        }
-    });
-
-
-    const topCategory = Object.entries(categoryTotals)
-
-        .sort(function (a, b) {
-            return b[1] - a[1];
-        })[0];
-
-
-    dashboardExpenseTotal.textContent =
-        "₹" + totalExpenses.toLocaleString("en-IN");
-
-
-    topExpenseCategory.textContent =
-        topCategory ? topCategory[0] : "No expenses yet";
-
-
-    if (topCategory) {
-
-        dashboardInsightMessage.textContent =
-            "Your highest spending is in " +
-            topCategory[0] +
-            " (₹" +
-            topCategory[1].toLocaleString("en-IN") +
-            ").";
-
-    } else {
-
-        dashboardInsightMessage.textContent =
-            "Add an expense to start seeing your spending insights.";
-    }
-}
-
-
-// ======================================
-// 11. DASHBOARD BUDGET OVERVIEW
-// ======================================
-
-function updateDashboardBudgets() {
-
-    dashboardBudgetOverview.replaceChildren();
-
-    if (budgets.length === 0) {
-
-        const message = document.createElement("p");
-
-        message.className = "empty-message";
-
-        message.textContent =
-            "No budgets created yet. Set your first monthly budget!";
-
-        dashboardBudgetOverview.appendChild(message);
-        return;
-    }
-
-
-    const currentMonth = getCurrentMonthString();
-
-
-    budgets.slice(0, 4).forEach(function (budget) {
-
-        let spent = 0;
-
-        transactions.forEach(function (transaction) {
-
-            if (
-                transaction.type === "expense" &&
-                String(transaction.category).toLowerCase() ===
-                    budget.category.toLowerCase() &&
-                transaction.date.startsWith(currentMonth)
-            ) {
-
-                spent += Number(transaction.amount) || 0;
-            }
-        });
-
-
-        const limit = Number(budget.amount);
-
-        const percentage =
-            limit > 0 ? (spent / limit) * 100 : 0;
-
-        const progress = Math.min(percentage, 100);
-
-        const remaining = limit - spent;
-
-
-        const item = document.createElement("div");
-        item.className = "dashboard-budget-item";
-
-
-        const heading = document.createElement("div");
-        heading.className = "dashboard-budget-heading";
-
-        const category = document.createElement("strong");
-        category.textContent = budget.category;
-
-        const amount = document.createElement("span");
-
-        amount.textContent =
-            "₹" + spent.toLocaleString("en-IN") +
-            " / ₹" + limit.toLocaleString("en-IN");
-
-        heading.append(category, amount);
-
-
-        const progressContainer = document.createElement("div");
-        progressContainer.className = "dashboard-budget-progress";
-
-        const progressBar = document.createElement("div");
-        progressBar.className = "dashboard-budget-fill";
-        progressBar.style.width = progress + "%";
-
-        if (percentage >= 100) {
-            progressBar.style.background = "#dc2626";
-        } else if (percentage >= 80) {
-            progressBar.style.background = "#f59e0b";
-        }
-
-        progressContainer.appendChild(progressBar);
-
-
-        const remainingText = document.createElement("p");
-        remainingText.className = "dashboard-budget-remaining";
-
-        remainingText.textContent = remaining < 0
-            ? "Over budget by ₹" +
-                Math.abs(remaining).toLocaleString("en-IN")
-            : "Remaining: ₹" +
-                remaining.toLocaleString("en-IN");
-
-
-        item.append(
-            heading,
-            progressContainer,
-            remainingText
-        );
-
-        dashboardBudgetOverview.appendChild(item);
-    });
-}
-
-
-// ======================================
-// 12. UPDATE COMPLETE DASHBOARD
+// 7. DASHBOARD SPENDING INSIGHTS
 // ======================================
 
 function updateDashboardOverview() {
+    const expenses = transactions.filter(function (transaction) {
+        return transaction.type === "expense";
+    });
 
-    updateRecentTransactions();
+    const categoryTotals = {};
 
-    updateSpendingInsight();
+    expenses.forEach(function (transaction) {
+        const category = transaction.category;
 
-    updateDashboardBudgets();
-}
+        categoryTotals[category] =
+            (categoryTotals[category] || 0) +
+            Number(transaction.amount);
+    });
 
+    const categories = Object.entries(categoryTotals)
+        .sort(function (a, b) {
+            return b[1] - a[1];
+        });
 
-// ======================================
-// 13. REFRESH ALL DATA VIEWS
-// ======================================
+    const categoryElement =
+        document.getElementById("topExpenseCategory");
 
-function refreshApp() {
+    const totalElement =
+        document.getElementById("dashboardExpenseTotal");
 
-    updateDashboard();
+    const messageElement =
+        document.getElementById("dashboardInsightMessage");
 
-    displayTransactions();
-
-    updateCharts();
-
-    displayBudgets();
-
-    updateDashboardOverview();
-}
-
-
-// ======================================
-// 14. ADD NEW TRANSACTION
-// ======================================
-
-transactionForm.addEventListener("submit", function (event) {
-
-    event.preventDefault();
-
-    const name =
-        document.getElementById("transactionName").value.trim();
-
-    const amount =
-        Number(document.getElementById("transactionAmount").value);
-
-    const type =
-        document.getElementById("transactionType").value;
-
-    const category =
-        document.getElementById("transactionCategory").value;
-
-    const date =
-        document.getElementById("transactionDate").value;
-
-
-    if (
-        !name ||
-        !Number.isFinite(amount) ||
-        amount <= 0 ||
-        !isValidDate(date)
-    ) {
-
-        alert("Please enter valid transaction details.");
+    if (categories.length === 0) {
+        categoryElement.textContent = "No expenses";
+        totalElement.textContent = formatCurrency(0);
+        messageElement.textContent =
+            "Add expense transactions to see your spending insights.";
         return;
     }
 
+    const topCategory = categories[0];
+
+    categoryElement.textContent = topCategory[0];
+    totalElement.textContent = formatCurrency(topCategory[1]);
+
+    messageElement.textContent =
+        `Your highest spending category is ${topCategory[0]}.`;
+}
+
+// ======================================
+// 8. ADD TRANSACTION
+// ======================================
+
+const transactionForm =
+    document.getElementById("transactionForm");
+
+transactionForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    const name = document.getElementById("transactionName").value.trim();
+    const amount = Number(
+        document.getElementById("transactionAmount").value
+    );
+    const type = document.getElementById("transactionType").value;
+    const category = document.getElementById("transactionCategory").value;
+    const date = document.getElementById("transactionDate").value;
+
+    if (!name || !Number.isFinite(amount) || amount <= 0 || !date) {
+        alert("Please enter valid transaction details.");
+        return;
+    }
 
     const newTransaction = {
         id: Date.now(),
@@ -809,41 +377,124 @@ transactionForm.addEventListener("submit", function (event) {
         date: date
     };
 
-
     transactions.push(newTransaction);
 
     saveTransactions();
-
+    refreshApp();
 
     transactionForm.reset();
 
     document.getElementById("transactionDate").value =
         getTodayString();
 
-
-    searchInput.value = "";
-    typeFilter.value = "all";
-    categoryFilter.value = "all";
-
-
-    refreshApp();
-
     alert("Transaction added successfully!");
 });
 
+// ======================================
+// 9. DISPLAY TRANSACTIONS
+// ======================================
+
+function displayTransactions(list = transactions) {
+    const transactionList =
+        document.getElementById("transactionList");
+
+    if (list.length === 0) {
+        transactionList.innerHTML = `
+            <tr>
+                <td colspan="6" class="empty-row">
+                    No transactions found.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    transactionList.innerHTML = list.map(function (transaction) {
+        const isIncome = transaction.type === "income";
+        const amountClass = isIncome ? "income-text" : "expense-text";
+        const sign = isIncome ? "+" : "-";
+
+        return `
+            <tr>
+                <td>${escapeHTML(transaction.name)}</td>
+                <td>${escapeHTML(transaction.category)}</td>
+                <td>${escapeHTML(transaction.date)}</td>
+                <td>${isIncome ? "Income" : "Expense"}</td>
+                <td class="${amountClass}">
+                    ${sign}${formatCurrency(transaction.amount)}
+                </td>
+                <td>
+                    <button class="action-button"
+                        onclick="editTransaction(${transaction.id})">
+                        Edit
+                    </button>
+                    <button class="action-button delete-button"
+                        onclick="deleteTransaction(${transaction.id})">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
 
 // ======================================
-// 15. EDIT TRANSACTION
+// 10. SEARCH AND FILTER
+// ======================================
+
+function filterTransactions() {
+    const searchValue = document
+        .getElementById("searchInput")
+        .value.toLowerCase()
+        .trim();
+
+    const typeValue =
+        document.getElementById("typeFilter").value;
+
+    const categoryValue =
+        document.getElementById("categoryFilter").value;
+
+    const filteredTransactions = transactions.filter(
+        function (transaction) {
+            const matchesSearch =
+                transaction.name.toLowerCase().includes(searchValue) ||
+                transaction.category.toLowerCase().includes(searchValue);
+
+            const matchesType =
+                typeValue === "all" || transaction.type === typeValue;
+
+            const matchesCategory =
+                categoryValue === "all" ||
+                transaction.category === categoryValue;
+
+            return matchesSearch && matchesType && matchesCategory;
+        }
+    );
+
+    displayTransactions(filteredTransactions);
+}
+
+document.getElementById("searchInput")
+    .addEventListener("input", filterTransactions);
+
+document.getElementById("typeFilter")
+    .addEventListener("change", filterTransactions);
+
+document.getElementById("categoryFilter")
+    .addEventListener("change", filterTransactions);
+
+// ======================================
+// 11. EDIT TRANSACTION
 // ======================================
 
 function editTransaction(id) {
-
     const transaction = transactions.find(function (item) {
         return item.id === id;
     });
 
-    if (!transaction) return;
-
+    if (!transaction) {
+        return;
+    }
 
     const newName = prompt(
         "Enter transaction name:",
@@ -852,290 +503,583 @@ function editTransaction(id) {
 
     if (newName === null) return;
 
+    const cleanedName = newName.trim();
+
+    if (!cleanedName) {
+        alert("Transaction name cannot be empty.");
+        return;
+    }
 
     const newAmount = prompt(
-        "Enter amount:",
+        "Enter new amount in INR:",
         transaction.amount
     );
 
     if (newAmount === null) return;
 
+    const parsedAmount = Number(newAmount);
 
-    const newType = prompt(
-        "Enter type (income/expense):",
-        transaction.type
-    );
-
-    if (newType === null) return;
-
-
-    const newCategory = prompt(
-        "Enter category:",
-        transaction.category
-    );
-
-    if (newCategory === null) return;
-
-
-    const newDate = prompt(
-        "Enter date (YYYY-MM-DD):",
-        transaction.date
-    );
-
-    if (newDate === null) return;
-
-
-    const amount = Number(newAmount);
-    const type = newType.trim().toLowerCase();
-
-
-    if (
-        newName.trim() === "" ||
-        !Number.isFinite(amount) ||
-        amount <= 0 ||
-        !["income", "expense"].includes(type) ||
-        newCategory.trim() === "" ||
-        !isValidDate(newDate.trim())
-    ) {
-
-        alert("Please enter valid transaction details.");
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        alert("Please enter a valid amount.");
         return;
     }
 
-
-    transaction.name = newName.trim();
-    transaction.amount = amount;
-    transaction.type = type;
-    transaction.category = newCategory.trim();
-    transaction.date = newDate.trim();
-
+    transaction.name = cleanedName;
+    transaction.amount = parsedAmount;
 
     saveTransactions();
-
     refreshApp();
 
     alert("Transaction updated successfully!");
 }
 
-
 // ======================================
-// 16. DELETE TRANSACTION
+// 12. DELETE TRANSACTION
 // ======================================
 
 function deleteTransaction(id) {
-
-    const confirmDelete = confirm(
+    const confirmed = confirm(
         "Are you sure you want to delete this transaction?"
     );
 
-    if (!confirmDelete) return;
-
+    if (!confirmed) return;
 
     transactions = transactions.filter(function (transaction) {
         return transaction.id !== id;
     });
 
-
     saveTransactions();
-
     refreshApp();
 
     alert("Transaction deleted successfully!");
 }
 
-
 // ======================================
-// 17. DISPLAY MONTHLY BUDGETS
+// 13. CREATE OR UPDATE BUDGET
 // ======================================
 
-function displayBudgets() {
-
-    budgetList.replaceChildren();
-
-    if (budgets.length === 0) {
-
-        const message = document.createElement("p");
-
-        message.className = "empty-message";
-
-        message.textContent =
-            "No budgets added yet. Set your first monthly budget!";
-
-        budgetList.appendChild(message);
-        return;
-    }
-
-
-    const currentMonth = getCurrentMonthString();
-
-
-    budgets.forEach(function (budget) {
-
-        let spent = 0;
-
-        transactions.forEach(function (transaction) {
-
-            if (
-                transaction.type === "expense" &&
-                String(transaction.category).toLowerCase() ===
-                    budget.category.toLowerCase() &&
-                transaction.date.startsWith(currentMonth)
-            ) {
-
-                spent += Number(transaction.amount) || 0;
-            }
-        });
-
-
-        const limit = Number(budget.amount);
-
-        const percentage =
-            limit > 0 ? (spent / limit) * 100 : 0;
-
-        const progress = Math.min(percentage, 100);
-
-        const remaining = limit - spent;
-
-
-        const card = document.createElement("article");
-        card.className = "budget-card";
-
-
-        const heading = document.createElement("h3");
-        heading.textContent = budget.category;
-
-
-        const details = document.createElement("p");
-        details.className = "budget-details";
-
-        details.textContent =
-            "Spent: ₹" +
-            spent.toLocaleString("en-IN") +
-            " / ₹" +
-            limit.toLocaleString("en-IN");
-
-
-        const progressContainer = document.createElement("div");
-        progressContainer.className = "budget-progress";
-
-        const progressBar = document.createElement("div");
-        progressBar.className = "budget-progress-fill";
-
-        progressBar.style.width = progress + "%";
-
-        if (percentage >= 100) {
-            progressBar.style.background = "#dc2626";
-        } else if (percentage >= 80) {
-            progressBar.style.background = "#f59e0b";
-        }
-
-        progressContainer.appendChild(progressBar);
-
-
-        const remainingText = document.createElement("p");
-
-        if (remaining < 0) {
-
-            remainingText.className = "budget-warning";
-
-            remainingText.textContent =
-                "Over budget by ₹" +
-                Math.abs(remaining).toLocaleString("en-IN");
-
-        } else {
-
-            remainingText.className = "budget-remaining";
-
-            remainingText.textContent =
-                "Remaining: ₹" +
-                remaining.toLocaleString("en-IN");
-        }
-
-
-        const percentText = document.createElement("p");
-        percentText.className = "budget-details";
-
-        percentText.textContent =
-            percentage.toFixed(1) + "% used";
-
-
-        card.append(
-            heading,
-            details,
-            progressContainer,
-            remainingText,
-            percentText
-        );
-
-        budgetList.appendChild(card);
-    });
-}
-
-
-// ======================================
-// 18. ADD OR UPDATE MONTHLY BUDGET
-// ======================================
+const budgetForm = document.getElementById("budgetForm");
 
 budgetForm.addEventListener("submit", function (event) {
-
     event.preventDefault();
 
-    const category = budgetCategory.value.trim();
-    const amount = Number(budgetAmount.value);
+    const category =
+        document.getElementById("budgetCategory").value;
 
+    const amount = Number(
+        document.getElementById("budgetAmount").value
+    );
 
-    if (
-        !category ||
-        !Number.isFinite(amount) ||
-        amount <= 0
-    ) {
-
-        alert("Please enter a valid category and budget amount.");
+    if (!Number.isFinite(amount) || amount <= 0) {
+        alert("Please enter a valid budget amount.");
         return;
     }
 
-
     const existingBudget = budgets.find(function (budget) {
-
-        return budget.category.toLowerCase() ===
-            category.toLowerCase();
+        return budget.category === category;
     });
 
-
     if (existingBudget) {
-
         existingBudget.amount = amount;
-
+        alert("Budget updated successfully!");
     } else {
-
         budgets.push({
+            id: Date.now(),
             category: category,
             amount: amount
         });
+
+        alert("Budget added successfully!");
     }
 
-
     saveBudgets();
-
-    budgetForm.reset();
-
-    // Update both Budget page and Dashboard preview
     refreshApp();
-
-    alert("Budget saved successfully!");
+    budgetForm.reset();
 });
 
+// ======================================
+// 14. DISPLAY BUDGETS
+// ======================================
+
+function displayBudgets() {
+    const budgetList = document.getElementById("budgetList");
+
+    if (budgets.length === 0) {
+        budgetList.innerHTML = "<p>No budgets created yet.</p>";
+        return;
+    }
+
+    budgetList.innerHTML = budgets.map(function (budget) {
+        const spent = getTotalExpensesByCategory(budget.category);
+        const percentage = budget.amount > 0
+            ? (spent / budget.amount) * 100
+            : 0;
+
+        const safePercentage = Math.min(percentage, 100);
+        const overBudget = spent > budget.amount;
+
+        return `
+            <div class="budget-card">
+                <h4>${escapeHTML(budget.category)}</h4>
+
+                <p>
+                    Spent: ${formatCurrency(spent)}
+                </p>
+
+                <p>
+                    Limit: ${formatCurrency(budget.amount)}
+                </p>
+
+                <div class="progress-track">
+                    <div class="progress-fill ${overBudget ? "over-budget" : ""}"
+                        style="width: ${safePercentage}%">
+                    </div>
+                </div>
+
+                <p>
+                    ${percentage.toFixed(1)}% used
+                    ${overBudget ? " - Over budget!" : ""}
+                </p>
+
+                <div class="budget-actions">
+                    <button class="action-button delete-button"
+                        onclick="deleteBudget(${budget.id})">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
 
 // ======================================
-// 19. INITIAL PAGE LOAD
+// 15. DELETE BUDGET
 // ======================================
 
-// Set today's date in transaction form
-document.getElementById("transactionDate").value =
-    getTodayString();
+function deleteBudget(id) {
+    const confirmed = confirm(
+        "Are you sure you want to delete this budget?"
+    );
 
-// Load all application data
-refreshApp();
+    if (!confirmed) return;
 
-// Open Dashboard first
-showPage("dashboard");
+    budgets = budgets.filter(function (budget) {
+        return budget.id !== id;
+    });
+
+    saveBudgets();
+    refreshApp();
+}
+
+// ======================================
+// 16. DASHBOARD BUDGET OVERVIEW
+// ======================================
+
+function updateDashboardBudgetOverview() {
+    const container = document.getElementById(
+        "dashboardBudgetOverview"
+    );
+
+    if (budgets.length === 0) {
+        container.innerHTML = "<p>No budgets created yet.</p>";
+        return;
+    }
+
+    container.innerHTML = budgets.map(function (budget) {
+        const spent = getTotalExpensesByCategory(budget.category);
+        const percentage = budget.amount > 0
+            ? (spent / budget.amount) * 100
+            : 0;
+
+        const safePercentage = Math.min(percentage, 100);
+
+        return `
+            <div class="budget-overview-item">
+                <div class="budget-overview-top">
+                    <strong>${escapeHTML(budget.category)}</strong>
+                    <span>
+                        ${formatCurrency(spent)} /
+                        ${formatCurrency(budget.amount)}
+                    </span>
+                </div>
+
+                <div class="progress-track">
+                    <div class="progress-fill ${percentage > 100 ? "over-budget" : ""}"
+                        style="width: ${safePercentage}%">
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+// ======================================
+// 17. ANALYTICS CHARTS
+// ======================================
+
+let expenseChart = null;
+let incomeExpenseChart = null;
+
+function updateCharts() {
+    if (typeof Chart === "undefined") {
+        console.error("Chart.js was not loaded.");
+        return;
+    }
+
+    // Expense totals by category.
+    const categoryTotals = {};
+
+    transactions.forEach(function (transaction) {
+        if (transaction.type === "expense") {
+            categoryTotals[transaction.category] =
+                (categoryTotals[transaction.category] || 0) +
+                Number(transaction.amount);
+        }
+    });
+
+    const categories = Object.keys(categoryTotals);
+    const categoryAmounts = Object.values(categoryTotals);
+
+    const expenseCanvas =
+        document.getElementById("expenseChart");
+
+    if (expenseChart) {
+        expenseChart.destroy();
+    }
+
+    expenseChart = new Chart(expenseCanvas, {
+        type: "doughnut",
+        data: {
+            labels: categories.length ? categories : ["No expenses"],
+            datasets: [{
+                data: categoryAmounts.length ? categoryAmounts : [1],
+                backgroundColor: [
+                    "#6257e8",
+                    "#16a36a",
+                    "#f3a64a",
+                    "#e05260",
+                    "#39a5c8",
+                    "#9b59b6",
+                    "#e67e22",
+                    "#95a5a6"
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            if (!categoryAmounts.length) {
+                                return "No expenses";
+                            }
+
+                            return context.label + ": " +
+                                formatCurrency(context.raw);
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Income versus expenses.
+    const totalIncome = getTotal("income");
+    const totalExpenses = getTotal("expense");
+
+    const incomeExpenseCanvas =
+        document.getElementById("incomeExpenseChart");
+
+    if (incomeExpenseChart) {
+        incomeExpenseChart.destroy();
+    }
+
+    incomeExpenseChart = new Chart(incomeExpenseCanvas, {
+        type: "bar",
+        data: {
+            labels: ["Income", "Expenses"],
+            datasets: [{
+                label: "Amount",
+                data: [totalIncome, totalExpenses],
+                backgroundColor: ["#16a36a", "#e05260"],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return formatCurrency(context.raw);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ======================================
+// 18. DARK MODE
+// ======================================
+
+const darkModeToggle =
+    document.getElementById("darkModeToggle");
+
+function applyDarkMode(enabled) {
+    document.body.classList.toggle("dark-mode", enabled);
+    darkModeToggle.checked = enabled;
+
+    localStorage.setItem(
+        "smartTrackDarkMode",
+        String(enabled)
+    );
+}
+
+const savedDarkMode =
+    localStorage.getItem("smartTrackDarkMode") === "true";
+
+applyDarkMode(savedDarkMode);
+
+darkModeToggle.addEventListener("change", function () {
+    applyDarkMode(darkModeToggle.checked);
+});
+
+// ======================================
+// 19. CURRENCY SETTINGS
+// ======================================
+
+const currencySelect =
+    document.getElementById("currencySelect");
+
+const currencyStatus =
+    document.getElementById("currencyStatus");
+
+currencySelect.value = getSelectedCurrency();
+
+currencySelect.addEventListener("change", async function () {
+    const previousCurrency = getSelectedCurrency();
+    const selectedCurrency = currencySelect.value;
+
+    currencySelect.disabled = true;
+    currencyStatus.textContent = "Getting the latest exchange rate...";
+
+    const success = await loadExchangeRate(selectedCurrency);
+
+    currencySelect.disabled = false;
+
+    if (!success) {
+        currencySelect.value = previousCurrency;
+        currencyStatus.textContent =
+            "Could not get the exchange rate. Please try again.";
+        alert("Currency conversion failed. Your previous currency is unchanged.");
+        return;
+    }
+
+    localStorage.setItem(
+        "smartTrackCurrency",
+        selectedCurrency
+    );
+
+    currencyStatus.textContent =
+        "Display currency updated successfully.";
+
+    // Refresh every screen that displays money.
+    refreshApp();
+
+    alert("Currency changed to " + selectedCurrency);
+});
+
+// ======================================
+// 20. EXPORT DATA
+// ======================================
+
+function exportData() {
+    const backup = {
+        transactions: transactions,
+        budgets: budgets,
+        exportDate: new Date().toISOString()
+    };
+
+    const data = JSON.stringify(backup, null, 4);
+
+    const blob = new Blob([data], {
+        type: "application/json"
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "smarttrack-backup.json";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+}
+
+// ======================================
+// 21. IMPORT DATA
+// ======================================
+
+const importButton =
+    document.getElementById("importButton");
+
+const importFile =
+    document.getElementById("importFile");
+
+importButton.addEventListener("click", function () {
+    importFile.click();
+});
+
+importFile.addEventListener("change", function () {
+    const file = importFile.files[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function (event) {
+        try {
+            const backup = JSON.parse(event.target.result);
+
+            if (
+                !backup ||
+                !Array.isArray(backup.transactions) ||
+                !Array.isArray(backup.budgets)
+            ) {
+                throw new Error("Invalid backup format.");
+            }
+
+            const confirmed = confirm(
+                "Importing will replace your current transactions and budgets. Continue?"
+            );
+
+            if (!confirmed) return;
+
+            transactions = backup.transactions;
+            budgets = backup.budgets;
+
+            saveTransactions();
+            saveBudgets();
+            refreshApp();
+
+            alert("Backup imported successfully!");
+
+        } catch (error) {
+            console.error(error);
+            alert("Invalid backup file. Please select a valid SmartTrack JSON backup.");
+        } finally {
+            importFile.value = "";
+        }
+    };
+
+    reader.readAsText(file);
+});
+
+// ======================================
+// 22. RESET DATA
+// ======================================
+
+function resetData() {
+    const confirmed = confirm(
+        "This will permanently delete all transactions and budgets. Are you sure?"
+    );
+
+    if (!confirmed) return;
+
+    transactions = [];
+    budgets = [];
+
+    saveTransactions();
+    saveBudgets();
+    refreshApp();
+
+    alert("All SmartTrack data has been reset.");
+}
+
+// ======================================
+// 23. HTML TEXT SAFETY
+// ======================================
+
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, function (character) {
+        const replacements = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+        };
+
+        return replacements[character];
+    });
+}
+
+// ======================================
+// 24. REFRESH THE COMPLETE APP
+// ======================================
+
+function refreshApp() {
+    updateDashboard();
+    updateRecentTransactions();
+    updateDashboardOverview();
+    displayTransactions();
+    displayBudgets();
+    updateDashboardBudgetOverview();
+
+    if (
+        document.getElementById("analytics").classList.contains("active")
+    ) {
+        updateCharts();
+    }
+}
+
+// ======================================
+// 25. INITIAL PAGE LOAD
+// ======================================
+
+async function initializeApp() {
+    document.getElementById("transactionDate").value =
+        getTodayString();
+
+    showPage("dashboard");
+
+    const selectedCurrency = getSelectedCurrency();
+
+    currencySelect.value = selectedCurrency;
+
+    currencyStatus.textContent =
+        "Loading exchange rate...";
+
+    const success = await loadExchangeRate(selectedCurrency);
+
+    if (!success) {
+        currencyStatus.textContent =
+            "Exchange rate unavailable. Showing amounts using the fallback rate.";
+    } else {
+        currencyStatus.textContent =
+            "Currency rates loaded.";
+    }
+
+    refreshApp();
+}
+
+initializeApp();
