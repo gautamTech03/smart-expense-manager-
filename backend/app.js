@@ -125,47 +125,104 @@
 
 // CREATION OF ROUTER'S
 
+// const http = require("http");
+
+// const server = http.createServer(function(req, res) {
+
+//     // Home route
+//     if (req.url === "/") {
+
+//         res.write("Welcome to SmartTrack!");
+//         res.end();
+
+//     }
+
+//     // About route
+//     else if (req.url === "/about") {
+
+//         res.write("SmartTrack is an expense management application.");
+//         res.end();
+
+//     }
+
+//     // Expenses route
+//     else if (req.url === "/expenses") {
+
+//         res.write("Your expenses will appear here.");
+//         res.end();
+
+//     }
+
+//     // contact's route
+//      else if (req.url === "/contact") {
+
+//         res.write("Contact us at contact@smarttrack.com");
+//         res.end();
+
+//     }
+
+
+//     // Unknown route
+//     else {
+
+//         res.write("404 - Page Not Found");
+//         res.end();
+
+//     }
+
+// });
+
+// server.listen(3000, function() {
+
+//     console.log("SmartTrack server running on port 3000");
+
+// });
+
+
+// ==================================================================================
+
+
+
 const http = require("http");
 
 const server = http.createServer(function(req, res) {
 
-    // Home route
-    if (req.url === "/") {
+    // GET request
+    if (req.method === "GET" && req.url === "/expenses") {
 
-        res.write("Welcome to SmartTrack!");
+        res.write("Showing all expenses");
         res.end();
 
     }
 
-    // About route
-    else if (req.url === "/about") {
+    // POST request
+    else if (req.method === "POST" && req.url === "/expenses") {
 
-        res.write("SmartTrack is an expense management application.");
+        res.write("New expense added");
         res.end();
 
     }
 
-    // Expenses route
-    else if (req.url === "/expenses") {
+    // PUT request
+    else if (req.method === "PUT" && req.url === "/expenses") {
 
-        res.write("Your expenses will appear here.");
+        res.write("Expense updated");
         res.end();
 
     }
 
-    // contact's route
-     else if (req.url === "/contact") {
+    // DELETE request
+    else if (req.method === "DELETE" && req.url === "/expenses") {
 
-        res.write("Contact us at contact@smarttrack.com");
+        res.write("Expense deleted");
         res.end();
 
     }
 
-
-    // Unknown route
+    // Unknown request
     else {
 
-        res.write("404 - Page Not Found");
+        res.write("404 - Route not found");
         res.end();
 
     }
@@ -177,3 +234,4 @@ server.listen(3000, function() {
     console.log("SmartTrack server running on port 3000");
 
 });
+
